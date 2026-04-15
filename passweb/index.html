@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Password lab</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --accent: #7c9cff;
+      --border: #2a2f3a;
+      --ok: #3dd68c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(1200px 800px at 20% 0%, #1a1f2e 0%, var(--bg) 55%);
+      color: var(--text);
+    }
+    main {
+      max-width: 40rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.25rem;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 0.875rem;
+      margin-bottom: 1.75rem;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.25rem 1rem;
+      margin-bottom: 1rem;
+    }
+    h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0 0 1rem;
+    }
+    label.row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.9375rem;
+    }
+    input[type="number"] {
+      width: 5rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+    }
+    input[type="checkbox"] {
+      width: 1rem;
+      height: 1rem;
+      accent-color: var(--accent);
+    }
+    .out {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      min-height: 3rem;
+      margin-bottom: 0.75rem;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #232836;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+    }
+    button.primary {
+      background: linear-gradient(180deg, #3a4a8a 0%, #2c3766 100%);
+      border-color: #4a5a9a;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hint { font-size: 0.8rem; color: var(--muted); margin-top: 0.35rem; }
+    .good { color: var(--ok); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Password lab</h1>
+    <p class="sub">
+      Random passwords and memorable phrases in the browser —
+      <strong>nothing leaves this page</strong>.
+    </p>
+
+    <section aria-labelledby="pw-title">
+      <h2 id="pw-title">Random password</h2>
+      <label class="row">
+        <span>Length</span>
+        <input id="len" type="number" min="3" max="256" value="16" />
+      </label>
+      <label class="row">
+        <span>Include symbols</span>
+        <input id="sym" type="checkbox" checked />
+      </label>
+      <label class="row">
+        <span>Exclude ambiguous (0/O/1/l/I…)</span>
+        <input id="amb" type="checkbox" checked />
+      </label>
+      <label class="row">
+        <span>How many</span>
+        <input id="cnt" type="number" min="1" max="20" value="1" />
+      </label>
+      <div class="actions" style="margin-top: 1rem;">
+        <button type="button" class="primary" id="genPw">Generate</button>
+        <button type="button" id="copyPw">Copy</button>
+      </div>
+      <div class="out" id="outPw" aria-live="polite"></div>
+      <p class="hint" id="pwMeta"></p>
+    </section>
+
+    <section aria-labelledby="pp-title">
+      <h2 id="pp-title">Passphrase (word list)</h2>
+      <label class="row">
+        <span>Words</span>
+        <input id="wcnt" type="number" min="1" max="32" value="6" />
+      </label>
+      <label class="row">
+        <span>Separator</span>
+        <input id="sep" type="text" maxlength="4" value="-" style="width:4rem;text-align:center;" />
+      </label>
+      <div class="actions" style="margin-top: 1rem;">
+        <button type="button" class="primary" id="genPp">Generate passphrase</button>
+        <button type="button" id="copyPp">Copy</button>
+      </div>
+      <div class="out" id="outPp" aria-live="polite"></div>
+      <p class="hint" id="ppMeta"></p>
+    </section>
+  </main>
+
+  <script>
+    const SYMBOLS = "!@#$%^&*()-_=+[]{};:,.?";
+    const AMBIGUOUS = new Set(["0", "O", "o", "1", "l", "L", "I"]);
+
+    function filterAmbiguous(s) {
+      return [...s].filter((c) => !AMBIGUOUS.has(c)).join("");
+    }
+
+    function randBelow(n) {
+      const max = 256 ** 4;
+      const lim = Math.floor(max / n) * n;
+      let x;
+      const buf = new Uint32Array(2);
+      do {
+        crypto.getRandomValues(buf);
+        x = buf[0] + (buf[1] * (256 ** 4));
+      } while (x >= lim);
+      return x % n;
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = randBelow(i + 1);
+        const t = arr[i];
+        arr[i] = arr[j];
+        arr[j] = t;
+      }
+      return arr;
+    }
+
+    function buildPools(includeSymbols, excludeAmbiguous) {
+      let letters = "";
+      for (let c = 65; c <= 90; c++) letters += String.fromCharCode(c);
+      for (let c = 97; c <= 122; c++) letters += String.fromCharCode(c);
+      let digits = "";
+      for (let c = 48; c <= 57; c++) digits += String.fromCharCode(c);
+      if (excludeAmbiguous) {
+        letters = filterAmbiguous(letters);
+        digits = filterAmbiguous(digits);
+      }
+      const pool =
+        letters +
+        digits +
+        (includeSymbols ? SYMBOLS : "");
+      return { letters, digits, symbols: SYMBOLS, pool };
+    }
+
+    function generatePassword(length, includeSymbols, excludeAmbiguous) {
+      const { letters, digits, symbols: symStr, pool } = buildPools(
+        includeSymbols,
+        excludeAmbiguous
+      );
+      const required = [
+        letters[randBelow(letters.length)],
+        digits[randBelow(digits.length)],
+      ];
+      if (includeSymbols) {
+        required.push(symStr[randBelow(symStr.length)]);
+      }
+      if (length < required.length) {
+        throw new Error(
+          `Length must be at least ${required.length} for these options.`
+        );
+      }
+      const chars = required.slice();
+      for (let i = 0; i < length - required.length; i++) {
+        chars.push(pool[randBelow(pool.length)]);
+      }
+      shuffle(chars);
+      return chars.join("");
+    }
+
+    /** Same word list as passphrase.py (subset for browser — embedded here). */
+    const WORDS = `
+    able acid acre aged also aqua atom auto away axis band barn belt best
+    bird blue boat body bold book boot boxy brim bulb bump calm camp card
+    cash city clay clip clock cloud coast coral craft creek dark dawn dell
+    dial dock door dove draw drift drill drive dune dust each east echo edge
+    elk elm emit epic fact fair farm fast field finch fire fish flame flare
+    flat fleet flow foam foil fork form fort free fresh front frost full
+    garden gate ghost glad globe glow gold grass green group grow gulf gull
+    habit half hand happy harbor hawk head help hill hive home honor hope
+    horse hotel hover huge icon idea idle image inch inner input invent island
+    jewel joint jump june junk kayak keen keep key kick kilo kind kite known
+    label lake lamp land lark last latch learn lens light limp lion list lumen
+    lunar mad map march match maze merry metal meter mimic minor mist model
+    month moon motor mount mouse movie music name narrow nature neat neon nest
+    noble north notch novel oak ocean offer olive onion open orbit outer oval
+    paint palm panel paper park path patio pearl pilot pine pixel plain plume
+    polar pond porch print prism proof proud pulse puppy quest quilt quiet
+    radar radio rain rally ranch rapid react reef relax rhythm ridge river
+    roast robot rocky round rover rural rust sail sand scarf scene scope scout
+    scrub seize shadow sharp shelf shell shine shoe shore shrub silent silk
+    silver simple sketch skill skull slate sleep slide slope small smart smile
+    smoke snake sneak snow solar solid sonic sound south spark speech spice
+    spirit split spoke spray spring square stack stamp stand star static steel
+    stick stone storm story strand stream stripe strong stump style sugar
+    summit sun surf swarm sweat swift table talent talk tape task taste teach
+    tent term thrift throw thumb thunder ticket timber titan toast token tonic
+    track trail train trait tramp trend trial truce trunk trust tumble tunnel
+    turf tutor twirl uncle undead unify union urban valid value vapor vessel
+    vivid vocal voice vowel wagon water weave wheat whisper wide wind wire
+    wisp wolf world woven write year yield young zebra zenith zesty zonal zoom
+    `
+      .trim()
+      .split(/\s+/);
+
+    function generatePassphrase(wordCount, separator) {
+      const parts = [];
+      for (let i = 0; i < wordCount; i++) {
+        parts.push(WORDS[randBelow(WORDS.length)]);
+      }
+      return parts.join(separator);
+    }
+
+    function entropyPassword(poolSize, length) {
+      if (poolSize < 2) return 0;
+      return length * (Math.log(poolSize) / Math.LN2);
+    }
+    function entropyPhrase(wordCount) {
+      return wordCount * (Math.log(WORDS.length) / Math.LN2);
+    }
+
+    const $ = (id) => document.getElementById(id);
+
+    $("genPw").addEventListener("click", () => {
+      const length = Number($("len").value);
+      const includeSymbols = $("sym").checked;
+      const excludeAmbiguous = $("amb").checked;
+      const count = Math.min(20, Math.max(1, Number($("cnt").value)));
+      const { pool } = buildPools(includeSymbols, excludeAmbiguous);
+      const lines = [];
+      for (let i = 0; i < count; i++) {
+        lines.push(generatePassword(length, includeSymbols, excludeAmbiguous));
+      }
+      $("outPw").textContent = lines.join("\n");
+      const bits = entropyPassword(pool.length, length);
+      $("pwMeta").textContent = `~${bits.toFixed(1)} bits (IID from charset size ${pool.length})`;
+      $("pwMeta").className = "hint";
+    });
+
+    $("copyPw").addEventListener("click", async () => {
+      const t = $("outPw").textContent;
+      if (!t) return;
+      await navigator.clipboard.writeText(t);
+      $("pwMeta").textContent = "Copied.";
+      $("pwMeta").className = "hint good";
+    });
+
+    $("genPp").addEventListener("click", () => {
+      const wordCount = Math.min(32, Math.max(1, Number($("wcnt").value)));
+      const sep = $("sep").value || "-";
+      const phrase = generatePassphrase(wordCount, sep);
+      $("outPp").textContent = phrase;
+      const bits = entropyPhrase(wordCount);
+      $("ppMeta").textContent = `~${bits.toFixed(
+        1
+      )} bits (IID over ${WORDS.length} words)`;
+      $("ppMeta").className = "hint";
+    });
+
+    $("copyPp").addEventListener("click", async () => {
+      const t = $("outPp").textContent;
+      if (!t) return;
+      await navigator.clipboard.writeText(t);
+      $("ppMeta").textContent = "Copied.";
+      $("ppMeta").className = "hint good";
+    });
+  </script>
+</body>
+</html>
